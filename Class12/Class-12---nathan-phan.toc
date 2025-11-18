@@ -1,0 +1,7 @@
+\contentsline {subsection}{\nonumberline Background}{1}{subsection*.3}%
+\contentsline {subsection}{\nonumberline Data Import}{1}{subsection*.5}%
+\contentsline {subsection}{\nonumberline Toy differential gene expression}{3}{subsection*.7}%
+\contentsline {subsection}{\nonumberline DESeq2 analysis}{6}{subsection*.9}%
+\contentsline {subsection}{\nonumberline Volcano Plot}{8}{subsection*.11}%
+\contentsline {subsection}{\nonumberline Save our results}{10}{subsection*.13}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
