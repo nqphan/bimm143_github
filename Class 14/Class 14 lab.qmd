@@ -1,0 +1,272 @@
+---
+title: "Class 14: RNASeq mini project"
+author: "Nathan Phan (A17395036)"
+format: pdf
+toc: True
+---
+
+## Background
+
+Here we work through a complete RNASeq analysis project. The input data comes from a knock-down experiment of a HOX gene.
+
+## Data Import
+
+Reading the `counts` and `metadata` CSV files
+
+```{r}
+counts <- read.csv("GSE37704_featurecounts.csv", row.names = 1)
+metadata <- read.csv("GSE37704_metadata.csv")
+```
+
+
+Check on data structure
+
+```{r}
+head(counts)
+```
+
+
+
+```{r}
+ncol(counts)
+```
+
+
+```{r}
+nrow(metadata)
+```
+
+
+looks like we need to get rid of the first "length" colunn of our `counts` object.
+
+```{r}
+cleancounts <-counts[ , -1]
+```
+
+```{r}
+colnames(cleancounts)
+```
+
+```{r}
+metadata$id
+```
+
+```{r}
+all( colnames(cleancounts) == metadata$id)
+```
+
+## Remove zero count genes
+
+There are lots of genes with zerp counts. We can remove these from further analysis.
+
+```{r}
+head(cleancounts)
+```
+
+```{r}
+to.keep.inds <- rowSums(cleancounts) > 0
+nonzero_counts <- cleancounts[to.keep.inds,]
+```
+
+
+
+## DESeq analysis
+Load the package
+
+```{r, message=FALSE}
+library(DESeq2)
+```
+
+
+Setup DESeq object
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = nonzero_counts,
+                              colData = metadata,
+                              design = ~condition)
+```
+
+run DESeq
+
+```{r}
+dds <- DESeq(dds)
+```
+
+get results
+
+```{r}
+res <- results(dds)
+head(res)
+```
+
+
+## Data visualization
+
+Volcano plot
+```{r}
+library(ggplot2)
+
+ggplot(res) +
+  aes(log2FoldChange, -log(padj)) +
+  geom_point()
+```
+Add threshold lines for fold-change and P-value and color our subset of genes that make these threshold cut-offs in the plot
+
+```{r}
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2] <- "blue"
+
+ggplot(res) +
+ aes(log2FoldChange, -log(padj)) +
+  geom_point(col=mycols) +
+  geom_vline(xintercept = c(-2,2), col="red") +
+  geom_hline(yintercept = -log(0.05), col="red")
+```
+
+
+## Add Annotation
+
+Add gene symbols and entrez ids
+
+
+```{r}
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+```
+
+
+```{r}
+columns(org.Hs.eg.db)
+
+res$Symbol = mapIds(org.Hs.eg.db,
+                    keys = row.names(res), 
+                    keytype = "ENSEMBL",
+                    column = "SYMBOL",
+                    multiVals = "first")
+
+res$Entrez = mapIds(org.Hs.eg.db,
+                    keys = row.names(res),
+                    keytype = "ENSEMBL",
+                    column = "ENTREZID",
+                    multiVals = "first")
+
+res$name = mapIds(org.Hs.eg.db,
+                  keys = row.names(res),
+                  keytype = "ENSEMBL",
+                  column = "GENENAME",
+                  multiVals = "first")
+
+head(res, 10)
+```
+
+## Pathway Analysis
+
+Run Gage analysis with KEGG
+
+```{r}
+library(gage)
+library(gageData)
+library(pathview)
+
+
+data(kegg.sets.hs)
+data(sigmet.idx.hs)
+
+
+kegg.sets.hs = kegg.sets.hs[sigmet.idx.hs]
+```
+
+We need a named vector 
+
+```{r}
+foldchanges = res$log2FoldChange
+names(foldchanges) = res$entrez
+head(foldchanges)
+keggres = gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+```{r}
+data(kegg.sets.hs)
+data(sigmet.idx.hs)
+
+# Focus on signaling and metabolic pathways only
+kegg.sets.hs = kegg.sets.hs[sigmet.idx.hs]
+
+# Examine the first 3 pathways
+head(kegg.sets.hs, 3)
+```
+```{r}
+head(keggres$less, 2)
+```
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa04110")
+```
+
+
+![](idkdawg.png)
+
+### GO terms
+
+Same analysis but using GO genesets rather than KEGG
+```{r}
+data(go.sets.hs)
+data(go.subs.hs)
+
+# Focus on Biological Process subset of GO
+gobpsets = go.sets.hs[go.subs.hs$BP]
+
+gobpres = gage(foldchanges, gsets=gobpsets, same.dir=TRUE)
+
+lapply(gobpres, head)
+```
+
+
+
+### Reactome
+
+Lots of folks like the reactome web interface. You can also run this as an R function but lets look at the website first. < https://reactome.org/
+
+The website wants a text file with one gene symbol per line of the genes you want to map to pathways.
+
+```{r}
+sig_genes <- res[res$padj <= 0.05 & !is.na(res$padj), ]$sym
+head(sig_genes)
+#res$symbols
+print(paste("Total number of significant genes:", length(sig_genes)))
+```
+
+and write out a file
+
+```{r}
+write.table(sig_genes, file="significant_genes.txt", row.names=FALSE, col.names=FALSE, quote=FALSE)
+```
+
+
+>Q: What pathway has the most significant “Entities p-value”? Do the most significant pathways listed match your previous KEGG results? What factors could cause differences between the two methods?
+
+The pathway with the lowest Entities p-value is the most significant. The Reactome results don’t exactly match the KEGG pathways, because the two methods use different pathway databases, different gene sets, and different statistical approaches, which naturally leads to differences in which pathways appear most enriched.
+
+
+## Save Our Results
+
+```{r}
+write.csv(res, file="myresults.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
