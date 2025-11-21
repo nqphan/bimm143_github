@@ -1,0 +1,72 @@
+```{r}
+install.packages("bio3d", repos = "https://cloud.r-project.org")
+library(bio3d)
+```
+#############################################
+# Function: analyze_protein_bfactors
+# Inputs:
+#   pdb_ids - a character vector of PDB IDs (e.g., c("4AKE", "1AKE", "1E4Y"))
+#   chain   - the chain ID to analyze (default = "A")
+#
+# Description:
+#   This function takes any set of PDB IDs, reads in their structures,
+#   extracts the alpha-carbon atoms for a specific chain, retrieves their
+#   B-factors, plots their B-factor profiles, and performs hierarchical
+#   clustering to compare the structures based on flexibility.
+#
+# Output:
+#   - Line plots of B-factor profiles for each structure
+#   - A dendrogram showing the clustering of input structures
+#
+# Example usage:
+#   analyze_protein_bfactors(c("4AKE", "1AKE", "1E4Y"), chain = "A")
+#############################################
+
+```{r}
+analyze_protein_bfactors <- function(pdb_ids, chain = "A") {
+  # Load required package
+  library(bio3d)
+  
+  # Initialize lists to store results
+  bfactors_list <- list()
+  trimmed_list <- list()
+  
+  # Loop through each PDB ID
+  for (pdb_id in pdb_ids) {
+    # Read and trim PDB to the desired chain and CA atoms
+    pdb <- read.pdb(pdb_id)
+    pdb_trimmed <- trim.pdb(pdb, chain = chain, elety = "CA")
+    
+    # Extract B-factors
+    bfactors <- pdb_trimmed$atom$b
+    
+    # Store in lists for later use
+    bfactors_list[[pdb_id]] <- bfactors
+    trimmed_list[[pdb_id]] <- pdb_trimmed
+  }
+  
+  # Plot B-factor profiles for each structure
+  for (i in seq_along(bfactors_list)) {
+  plotb3(
+    bfactors_list[[i]],
+    sse = trimmed_list[[i]],
+    typ = "l",
+    ylab = "B-factor",
+    main = paste("B-factor profile:", names(bfactors_list)[i])
+  )
+}
+  # Combine B-factors for clustering
+  bfactors_matrix <- do.call(rbind, bfactors_list)
+  
+  # Perform hierarchical clustering
+  hc <- hclust(dist(bfactors_matrix))
+  
+  # Plot dendrogram
+  plot(hc, main = "Hierarchical Clustering of B-factors")
+}
+
+# Example function call (this line runs the analysis)
+analyze_protein_bfactors(c("4AKE", "1AKE", "1E4Y"), chain = "A")
+```
+
+
