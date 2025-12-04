@@ -9,11 +9,11 @@ Classwork for [BIMM143 at UC San Diego](https://bioboot.github.io/bimm143_F25/) 
 
 - Class 07 [Machine Learning 1](Class7/Lab07.md)
 
-- Class 08 [Mini Project](class08/class08.md)
+- Class 08 [Mini Project](Lab08/Class08.md)
 
 - Class 09 [Structural Bioinformatics](class09/class09.md)
 
-- Class 10 [Halloween Candy Mini Project](class10/class10.md)
+- Class 10 [Halloween Candy Mini Project](Class10/Lab10.md)
 
 - Class 11 [Alphafold Bioinformatics](class11/class11.md)
 
