@@ -1,0 +1,379 @@
+---
+title: "Breast Cancer PCA report"
+author: "Nathan Phan (PID: A17395036)"
+format: gfm
+toc: true
+  
+---
+
+## Background
+
+The goal of this mini-project is to explore a complete analysis using the unsupervised learning technique covered in our last class.
+
+The data itself comes from the Wisconsin Breast Cancer Diagnostic Data Set first reported by K. P. Benne and O. L. Mangasarian: “Robust Linear Programming Discrimination of Two Linearly Inseparable Sets”.
+
+Values in this data set describe characteristics of the cell nuclei present in digitized images of a fine needle aspiration (FNA) of a breast mass.
+
+## Data import
+
+Data was downloaded from the class website as a CSV file
+
+```{r}
+wisc.df <- read.csv("wisconsinCancer.csv", row.names=1)
+head(wisc.df)
+```
+
+Remove the diagnosis from data for subsequent analysis
+```{r}
+wisc.data <- wisc.df[,-1]
+dim(wisc.data)
+```
+
+The first column `diagnosis` is the expert opinion on the sample (i.e patient FNA)
+
+```{r}
+wisc.df$diagnosis
+```
+
+```{r}
+wisc.df[,-1]
+dim(wisc.data)
+```
+
+Remove the diagnosis from data for subsequent analysis
+```{r}
+wisc.data <- wisc.df[,-1]
+dim(wisc.data)
+```
+
+Store the diagnosis as a vector for use later when we compare our results to those from experts in the field.
+
+```{r}
+diagnosis <- factor(wisc.df$diagnosis)
+```
+
+>Q1. How many observations are in the dataset?
+
+There are `r nrow(wisc.data)` observations/pateinets in the dataset.
+
+>Q2. How many of the observations have a malignant diagnosis?
+
+```{r}
+table(wisc.df$diagnosis)
+```
+
+>Q3. How many variables/features in the data are suffixed with _mean?
+
+```{r}
+#colnames(wisc.data)
+length(grep("_mean", colnames(wisc.data)))
+```
+
+## Principal Component Analysis
+
+
+
+The proportion for PC1 is in the “Proportion of Variance” row under PC1.
+
+>Q5. How many principal components (PCs) are required to describe at least 70% of the original variance in the data?
+
+4 PCs are needed to explain at least 70% of the variance
+
+
+
+>Q6. How many principal components (PCs) are required to describe at least 90% of the original variance in the data?
+
+7 PCs are needed to reach 90% of the variance
+
+
+>Q7. What stands out to you about this plot? Is it easy or difficult to understand? Why?
+
+The plot shows some separation between two groups, but it's a bit hard to interpret since the axes PC1 and PC2 don't represent specific features. Color would make it easier to see the groups.
+
+
+The `prcomp()` function to do PCA has a `scale-FALSE` default. In general we nearly always want tot set this to TRUE so our analysis is not dominated by columns/variables in our dataset that have high standard deviation and mean when compared to others just because the units of measurements are on different unit/scales.
+
+```{r}
+wisc.pr <- prcomp(wisc.data, scale=TRUE)
+summary(wisc.pr)
+```
+The main PC result figure is called a "score plot" or "PC plot" or "ordintion plot"...
+
+```{r}
+library(ggplot2)
+
+ggplot(wisc.pr$x) +
+  aes(PC1, PC2, col=diagnosis) +
+  geom_point()
+```
+>Q8. Generate a similar plot for principal components 1 and 3. What do you notice about these plots?
+
+The PC1 vs PC3 plot shows a similar pattern to the PC1 vs PC2 plot, but the separation between groups is less clear. This suggests that PC3 explains less of the variation related to the groups.
+
+
+## PCA Scree-lot
+
+A plot of how much variance each PC captures. We can get this from `wisc.pr$sdev` or from the output of `summary(wisc.pr)`
+
+```{r}
+var.tbl <- summary(wisc.pr)
+head(var.tbl$importance)
+```
+
+```{r}
+var <- c(1, var.tbl$importance[2,])
+cum.var <- c(0, var.tbl$importance[3,])
+
+plot(var * 100, typ="b",
+     ylab="Percent Variance Captured",
+     xlab="PC Number")
+```
+
+```{r}
+
+plot(cum.var * 100, typ="o",
+     ylab="Percent Variance Captured",
+     xlab="PC Number",
+     ylim=c(0,100))
+points(var * 100, col="blue", typ="o")
+```
+
+## communicating PCA results
+
+>Q9. For the first principal component, what is the component of the loading vector (i.e. wisc.pr$rotation[,1]) for the feature concave.points_mean?
+
+```{r}
+wisc.pr$rotation["concave.points_mean", "PC1"]
+```
+
+>Q10. What is the minimum number of principal components required to explain 80% of the variance of the data?
+
+We need 5 PCs to capture more than 80% variance
+
+```{r}
+summary(wisc.pr)
+```
+
+
+
+
+
+
+
+## Hierarchical Clustering
+
+Just clustering the original data is not very informative or helpful.
+
+```{r}
+# Scale data
+data.scaled <- scale(wisc.data)
+
+# Pairwise Euclidean distances
+data.dist <- dist(data.scaled, method = "euclidean")
+
+# Hierarchical clustering using complete linkage
+wisc.hclust <- hclust(data.dist, method = "complete")
+
+```
+
+View the clustering dendrogram result
+
+```{r}
+plot(wisc.hclust)
+```
+
+
+```{r}
+wisc.hclust.clusters <- cutree(wisc.hclust, k=4)
+table(wisc.hclust.clusters)
+```
+
+```{r}
+table(wisc.hclust.clusters, diagnosis)
+```
+>Q13. Which method gives your favorite results for the same data.dist dataset? Explain your reasoning.
+
+```{r}
+methods <- c("single","complete","average","ward.D2")
+for (m in methods) {
+  hc <- hclust(data.dist, method = m)
+  plot(hc, main = paste("method =", m), labels = FALSE)
+}
+
+```
+war.d2 or cluster 1 is the best
+
+
+>Q14. How well does k-means separate the two diagnoses? How does it compare to your hclust results?
+
+K-means separates the two diagnoses fairly well but not perfectly. It often produces similar groupings to hierarchical clustering, though ward.D2 hierarchical clustering sometimes aligns better with the real diagnosis labels.
+
+
+## Combining methods (PCA and Clustering)
+
+Clustering the original data was not very productive. The PCA results looked promising. Here we combine these methods by clustering from our PCA results. In other words "clustering in PC space"...
+
+
+```{r}
+# Use PCs that explain >= 90% (earlier we found this is 7 PCs)
+wisc.pr.x7 <- wisc.pr$x[, 1:7]
+
+# compute distance and apply ward.D2 clustering
+wisc.pr.dist <- dist(wisc.pr.x7)
+wisc.pr.hclust <- hclust(wisc.pr.dist, method = "ward.D2")
+
+# plot dendrogram
+plot(wisc.pr.hclust, labels = FALSE, main = "HClust on first 7 PCs (ward.D2)")
+
+# cut into 2 clusters
+wisc.pr.hclust.clusters <- cutree(wisc.pr.hclust, k = 2)
+table(wisc.pr.hclust.clusters, diagnosis)
+
+```
+
+```{r}
+##Take the first 3 PCs
+dist.pc <- dist(wisc.pr$x[,1:3] )
+wisc.pr.hclust <- hclust(dist.pc, method="ward.D2")
+```
+
+View the tree...
+```{r}
+plot(wisc.pr.hclust)
+abline(h=70, col="red")
+```
+
+To get our clustering membership vector (i.e. our main clustering result) we
+
+I am missing this section I am sorry and the text but until
+
+the tree at a desired height or to yield a desired number of "k" groups.
+
+```{r}
+grps <- cutree(wisc.pr.hclust, h=70)
+```
+
+```{r}
+grps <- cutree(wisc.pr.hclust, k=2)
+table(grps)
+```
+
+How does this clustering grps compare to the expert diagnosis
+
+```{r}
+table(grps, diagnosis)
+```
+
+```{r}
+## Use the distance along the first 7 PCs for clustering i.e. wisc.pr$x[, 1:7]
+wisc.pr.hclust.clusters <- cutree(wisc.pr.hclust, k=2)
+```
+
+
+```{r}
+methods <- c("single","complete","average","ward.D2")
+for (m in methods) {
+  hc <- hclust(data.dist, method = m)
+  plot(hc, main = paste("method =", m), labels = FALSE)
+}
+
+```
+
+>Q15. How well does the newly created model with four clusters separate out the two diagnoses?
+
+```{r}
+wisc.pr.hclust.clusters
+```
+
+```{r}
+# Using the provided values:
+TP <- 188
+FN <- 24
+TN <- 329
+FP <- 28
+
+sensitivity <- TP / (TP + FN)   # TP/(TP + FN)
+specificity <- TN / (TN + FP)   # TN/(TN + FP)
+sensitivity; specificity
+# numeric values:
+# sensitivity = 188 / (188 + 24) ≈ 0.8868  (~88.7%)
+# specificity = 329 / (329 + 28) ≈ 0.9210  (~92.1%)
+
+```
+
+>Q16. How well do the k-means and hierarchical clustering models you created in previous sections (i.e. before PCA) do in terms of separating the diagnoses? Again, use the table() function to compare the output of each model (wisc.km$cluster and wisc.hclust.clusters) with the vector containing the actual diagnoses.
+
+```{r}
+set.seed(101)   # reproducibility
+wisc.km <- kmeans(scale(wisc.data), centers = 2, nstart = 20)
+table(wisc.km$cluster, diagnosis)
+
+##    diagnosis
+##       B   M
+##   1  14 175
+##   2 343  37
+# Example: k-means result matrix
+tbl_km <- table(wisc.km$cluster, diagnosis)
+tbl_hc <- table(wisc.hclust.clusters, diagnosis)
+# Compute sensitivity/specificity for chosen mapping (set predicted malignant cluster id)
+# Example: if predicted malignant corresponds to cluster 1 in kmeans:
+TP_km <- tbl_km["1","M"]
+FN_km <- sum(tbl_km[ , "M"]) - TP_km
+TN_km <- tbl_km["2","B"]
+FP_km <- sum(tbl_km[ , "B"]) - TN_km
+sensitivity_km <- TP_km/(TP_km + FN_km)
+specificity_km <- TN_km/(TN_km + FP_km)
+
+```
+ 
+ >Q17. Which of your analysis procedures resulted in a clustering model with the best specificity? How about sensitivity?
+
+For specificity PCA+ward.D2 had the highest
+For sensitivity PCA+ward.D2 also had the highets
+
+
+```{r}
+#url <- "new_samples.csv"
+url <- "https://tinyurl.com/new-samples-CSV"
+new <- read.csv(url)
+npc <- predict(wisc.pr, newdata=new)
+npc
+```
+
+```{r}
+plot(wisc.pr$x[,1:2])
+points(npc[,1], npc[,2], col="blue", pch=16, cex=3)
+text(npc[,1], npc[,2], c(1,2), col="white")
+```
+im not sure why this code does not work when i copied it exactly
+
+>Q18. Which of these new patients should we prioritize for follow up based on your results?
+
+Prioritize new patient 1(PC1= +2.5766)
+
+>Q4. From your results, what proportion of the original variance is captured by the first principal components (PC1)?
+
+```{r}
+summary(wisc.pr)
+
+```
+
+>Q11. Using the plot() and abline() functions, what is the height at which the clustering model has 4 clusters?
+
+```{r}
+plot(wisc.hclust)
+abline(h = 20, col = "red")
+
+```
+
+From the dendrogram, the model has 4 clusters at a height of about 20 (the height where the horizontal cut creates 4 groups).
+
+>Q12. Can you find a better cluster vs diagnoses match by cutting into a different number of clusters between 2 and 10?
+
+3 or 4 clusters give bettter separation
+
+```{r}
+plot(wisc.hclust)
+rect.hclust(wisc.hclust, k = 3, border = "blue")  # example for 3 clusters
+
+```
