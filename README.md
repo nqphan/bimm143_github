@@ -7,7 +7,7 @@ Classwork for [BIMM143 at UC San Diego](https://bioboot.github.io/bimm143_F25/) 
   
 - Class 06 [Writing R functions](Class06/Class6.md)
 
-- Class 07 [Machine Learning 1](class07/class07.md)
+- Class 07 [Machine Learning 1](Class7/Lab07.md)
 
 - Class 08 [Mini Project](class08/class08.md)
 
